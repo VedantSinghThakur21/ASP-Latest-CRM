@@ -39,7 +39,7 @@ export const useAuthStore = create<AuthStore>()(
           const user = await signIn(email, password);
           
           // Ensure we have a current user and get their token
-          if (!auth.currentUser) {
+          if (!auth || !auth.currentUser) {
             throw new Error('Authentication failed: No current user');
           }
           

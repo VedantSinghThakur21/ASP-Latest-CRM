@@ -29,13 +29,38 @@ import { ProtectedRoute } from './components/auth/SimpleProtectedRoute';
 function DashboardRouter() {
   const { user, isAuthenticated } = useAuthStore();
   
+  console.log('🏠 DashboardRouter called - User:', user, 'Authenticated:', isAuthenticated);
+  
   // This should never actually happen because of ProtectedRoute,
   // but it's a safety check
   if (!isAuthenticated || !user) {
+    console.log('❌ DashboardRouter: User not authenticated or missing, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
+  // Ensure user role exists
+  if (!user.role) {
+    console.log('❌ DashboardRouter: User role is undefined');
+    
+    // Assign a default role based on email
+    let defaultRole = 'operator';
+    if (user.email) {
+      if (user.email.includes('admin')) {
+        defaultRole = 'admin';
+      } else if (user.email.includes('sales')) {
+        defaultRole = 'sales_agent';
+      } else if (user.email.includes('manager') || user.email.includes('ops')) {
+        defaultRole = 'operations_manager';
+      }
+    }
+    
+    console.log(`✅ Assigned default role: ${defaultRole} based on email: ${user.email}`);
+    user.role = defaultRole as any;
+  }
+  
   // Return the appropriate dashboard based on role
+  console.log('👤 Loading dashboard for role:', user.role);
+  
   switch (user.role) {
     case 'admin':
       return <AdminDashboard />;
@@ -46,6 +71,7 @@ function DashboardRouter() {
     case 'operator':
       return <OperatorDashboard />;
     default:
+      console.log('❌ Unknown user role:', user.role, 'redirecting to login');
       return <Navigate to="/login" replace />;
   }
 }

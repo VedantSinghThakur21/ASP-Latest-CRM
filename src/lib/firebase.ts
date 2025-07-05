@@ -16,11 +16,41 @@ export const firebaseConfig = {
 };
 
 // Initialize Firebase only if it hasn't been initialized yet
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
-export const db = getFirestore(app);
+console.log('🔥 Initializing Firebase with config:', {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain
+});
 
-// Configure auth with persistence
-export const auth = getAuth(app);
+let app;
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+  console.log('✅ Firebase app initialized successfully');
+} catch (error) {
+  console.error('❌ Error initializing Firebase app:', error);
+  app = null;
+}
+
+// Initialize Firestore
+let firestoreDb;
+try {
+  firestoreDb = app ? getFirestore(app) : null;
+  console.log('✅ Firestore initialized successfully');
+} catch (error) {
+  console.error('❌ Error initializing Firestore:', error);
+  firestoreDb = null;
+}
+export const db = firestoreDb;
+
+// Initialize Auth
+let firebaseAuth;
+try {
+  firebaseAuth = app ? getAuth(app) : null;
+  console.log('✅ Firebase Auth initialized successfully');
+} catch (error) {
+  console.error('❌ Error initializing Firebase Auth:', error);
+  firebaseAuth = null;
+}
+export const auth = firebaseAuth;
 
 // DISABLED Firebase persistence - require explicit login
 // Clear any existing authentication state to prevent auto-login
@@ -39,15 +69,23 @@ try {
       console.log('� No explicit login detected - clearing any Firebase auth state');
       
       // Sign out current user
-      auth.signOut().then(() => {
-        console.log('✅ Cleared Firebase auth state');
-        
-        // Redirect to login page
+      if (auth) {
+        auth.signOut().then(() => {
+          console.log('✅ Cleared Firebase auth state');
+          
+          // Redirect to login page
+          if (window.location.pathname !== '/login') {
+            console.log('🔄 Redirecting to login page');
+            window.location.href = '/login';
+          }
+        });
+      } else {
+        console.warn('⚠️ Auth is null, cannot sign out');
+        // Force redirect to login page
         if (window.location.pathname !== '/login') {
-          console.log('🔄 Redirecting to login page');
           window.location.href = '/login';
         }
-      });
+      }
     } else {
       console.log('� Explicit login detected - allowing session to continue');
     }
@@ -58,17 +96,21 @@ try {
   console.error('❌ Error in Firebase auth state cleanup:', error);
 }
 
-// Enable offline persistence
-enableIndexedDbPersistence(db)
-  .catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.error('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.error('The current browser does not support persistence.');
-    } else {
-      console.error('Error enabling persistence:', err);
-    }
-  });
+// Enable offline persistence if db is initialized
+if (db) {
+  enableIndexedDbPersistence(db)
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.error('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+      } else if (err.code === 'unimplemented') {
+        console.error('The current browser does not support persistence.');
+      } else {
+        console.error('Error enabling persistence:', err);
+      }
+    });
+} else {
+  console.warn('⚠️ Cannot enable IndexedDB persistence: Firestore not initialized');
+}
 
 // Only set up initial users if explicitly requested with a flag
 // This prevents hitting Firebase rate limits with too many account creation attempts
