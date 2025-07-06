@@ -2,23 +2,69 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to get the user document and check roles
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(roles) {
+      let userData = getUserData();
+      return userData != null && userData.role in roles;
+    }
+    
+    function isAdmin() {
+      let userData = getUserData();
+      return userData != null && userData.role == 'admin';
+    }
+    
+    function isOperationsManager() {
+      let userData = getUserData();
+      return userData != null && userData.role == 'operations_manager';
+    }
+    
+    function isSalesAgent() {
+      let userData = getUserData();
+      return userData != null && userData.role == 'sales_agent';
+    }
+    
     // Allow authenticated users to read and write their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow authenticated users to read all users (needed for admin functions)
-    match /users/{userId} {
       allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if request.auth != null && 
+                                   (request.auth.uid == userId || isAdmin());
     }
     
-    // General rule - authenticated users can read other collections
-    match /{collection}/{document=**} {
+    // Allow access to leads
+    match /leads/{leadId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && 
-                    (request.auth.token.role == 'admin' || 
-                     request.auth.token.role == 'operations_manager' ||
-                     request.auth.token.role == 'sales_agent');
+                  (isAdmin() || isSalesAgent() || isOperationsManager());
+    }
+    
+    // Allow access to quotations
+    match /quotations/{quotationId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                  (isAdmin() || isSalesAgent() || isOperationsManager());
+    }
+    
+    // Allow access to jobs
+    match /jobs/{jobId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Allow access to deals
+    match /deals/{dealId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Default rule for other collections
+    match /{collection}/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
     }
   }
 }
